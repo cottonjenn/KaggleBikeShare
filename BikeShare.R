@@ -339,26 +339,45 @@ train_clean <- train %>%
   select(-casual, -registered) %>% # Remove columns as per HW
   mutate(count = log(count))        # Log-transform target variable
 
-bike_recipe <- recipe(count ~ ., data = train_clean) %>%
-  step_mutate(weather = ifelse(weather == 4, 3, weather)) %>% # Recode weather 4->3
-  step_mutate(weather = factor(weather)) %>%
-  step_mutate(holiday = factor(holiday)) %>%
-  step_mutate(workingday = factor(workingday)) %>%
-  step_mutate(season = factor(season)) %>%
-  step_mutate(hour = hour(datetime)) %>%
-  step_mutate(hour_sin = sin(2 * pi * hour / 24),
-              hour_cos = cos(2 * pi * hour / 24)) %>%
-  step_date(datetime, features="month") %>%
-  step_date(datetime, features = "doy") %>%
-  step_time(datetime, features = "hour") %>%
-  step_interact(~datetime_hour:workingday) %>%
-  step_rm(datetime) %>%
-  step_normalize(all_numeric_predictors()) %>%
-  step_dummy(all_nominal_predictors()) %>%
-  step_zv(all_predictors()) # Remove zero-variance predictors
+# bike_recipe <- recipe(count ~ ., data = train_clean) %>%
+#   step_mutate(weather = ifelse(weather == 4, 3, weather)) %>% # Recode weather 4->3
+#   step_mutate(weather = factor(weather)) %>%
+#   step_mutate(holiday = factor(holiday)) %>%
+#   step_mutate(workingday = factor(workingday)) %>%
+#   step_mutate(season = factor(season)) %>%
+#   step_mutate(hour = hour(datetime)) %>%
+#   step_mutate(hour_sin = sin(2 * pi * hour / 24),
+#               hour_cos = cos(2 * pi * hour / 24)) %>%
+#   step_date(datetime, features="month") %>%
+#   step_date(datetime, features = "doy") %>%
+#   step_time(datetime, features = "hour") %>%
+#   step_interact(~datetime_hour:workingday) %>%
+#   step_rm(datetime) %>%
+#   step_normalize(all_numeric_predictors()) %>%
+#   step_dummy(all_nominal_predictors()) %>%
+#   step_zv(all_predictors()) # Remove zero-variance predictors
 
-# new_data <- bake(prep(bike_recipe), new_data=train_clean)
-# vroom_write(new_data, "new_data.csv", delim = ",")
+bike_recipe <- recipe(count~., data=train_clean) %>% 
+  step_mutate(weather = ifelse(weather == 4, 3, weather)) %>%
+  step_mutate(weather = as.factor(weather)) %>%
+  step_date(datetime, features = "dow") %>%
+  step_time(datetime, features = c("hour")) %>%
+  step_date(datetime, features = c("month")) %>%
+  step_date(datetime, features = c("year")) %>%
+  step_mutate(datetime_dow = as.factor(datetime_dow)) %>%
+  step_mutate(datetime_hour = as.factor(datetime_hour)) %>%
+  step_mutate(datetime_month = as.factor(datetime_month)) %>%
+  step_mutate(datetime_year = as.factor(datetime_year)) %>%
+  step_interact(~datetime_hour:workingday) %>%
+  step_interact(~datetime_hour:datetime_dow) %>%
+  step_mutate(season = as.factor(season)) %>%
+  step_zv(all_predictors()) %>%
+  step_rm(datetime) %>%
+  step_dummy(all_nominal_predictors()) %>% 
+  step_normalize(all_numeric_predictors())
+
+new_data <- bake(prep(bike_recipe), new_data=train_clean)
+vroom_write(new_data, "new_data.csv", delim = ",")
 
 # preg_model <- bart(trees = tune()) %>%
 #   set_engine("dbarts") %>%
