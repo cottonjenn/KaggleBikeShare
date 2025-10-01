@@ -3,8 +3,10 @@ library(tidymodels)
 library(vroom)
 library(dplyr)
 library(DataExplorer)
-library(patchwork)
+# library(patchwork)
 library(lubridate)  # for hour extraction
+library(bonsai)
+library(lightgbm)
 
 # Load data
 train <- vroom("C:/Users/Jenna/OneDrive/Desktop/Statistics/Stat 348/BikeShare/train.csv")
@@ -261,7 +263,78 @@ test <- vroom("C:/Users/Jenna/OneDrive/Desktop/Statistics/Stat 348/BikeShare/tes
 # 
 # vroom_write(kaggle_submission, "LinearPreds_v4.csv", delim = ",")
 
-### HW random forests ------------------------------------------------
+# ### HW random forests ------------------------------------------------
+# train_clean <- train %>%
+#   select(-casual, -registered) %>% # Remove columns as per HW
+#   mutate(count = log(count))        # Log-transform target variable
+# 
+# bike_recipe <- recipe(count ~ ., data = train_clean) %>%
+#   step_mutate(weather = ifelse(weather == 4, 3, weather)) %>% # Recode weather 4->3
+#   step_mutate(weather = factor(weather)) %>%
+#   step_mutate(holiday = factor(holiday)) %>%
+#   step_mutate(workingday = factor(workingday)) %>%
+#   step_mutate(season = factor(season)) %>%
+#   step_mutate(hour = hour(datetime)) %>%
+#   step_mutate(hour_sin = sin(2 * pi * hour / 24),
+#               hour_cos = cos(2 * pi * hour / 24)) %>%
+#   step_date(datetime, features="month") %>%
+#   step_date(datetime, features = "doy") %>%
+#   step_rm(datetime) %>%
+#   step_normalize(all_numeric_predictors()) %>%
+#   step_dummy(all_nominal_predictors()) %>%
+#   step_zv(all_predictors()) # Remove zero-variance predictors
+# 
+# # bake(prep(bike_recipe), new_data=train_clean) %>%
+# #   summary(.)
+# 
+# preg_model <- rand_forest(mtry = tune(), 
+#                           min_n = tune(),
+#                           trees=500) %>%
+#   set_engine("ranger") %>%
+#   set_mode("regression")
+# 
+# preg_wf <- workflow() %>%
+#   add_recipe(bike_recipe) %>%
+#   add_model(preg_model) 
+# 
+# prepped <- prep(bike_recipe)
+# num_predictors <- ncol(bake(prepped, new_data = NULL)) - 1
+# 
+# grid_of_tuning_params <- grid_regular(mtry(range = c(1, num_predictors)),
+#                                       min_n(),
+#                                       levels = 5)
+# 
+# # grid_of_tuning_params <- grid_regular(mtry(range=c(1, ncol(train_clean)-1)),
+# #                                       min_n(),
+# #                                       levels =5)
+# 
+# folds <- vfold_cv(train_clean, v = 10, repeats = 1)
+# 
+# CV_results <- preg_wf %>%
+#   tune_grid(resamples=folds,
+#             grid=grid_of_tuning_params,
+#             metrics = metric_set(rmse)) #change to mae 
+# 
+# bestTune <- CV_results |>
+#   select_best(metric="rmse")
+# 
+# final_wf <-preg_wf |>
+#   finalize_workflow(bestTune) |>
+#   fit(data=train_clean)
+# 
+# bike_preds <- final_wf %>%
+#   predict(new_data=test) %>%
+#   mutate(count = exp(.pred))
+# 
+# kaggle_submission <- bike_preds %>%
+#   bind_cols(test %>% select(datetime)) %>%  # Keep original test datetime
+#   select(datetime, count) %>%               # Column order
+#   mutate(count = pmax(0, count)) %>%
+#   mutate(datetime=as.character(format(datetime)))
+# 
+# vroom_write(kaggle_submission, "LinearPreds_v4.csv", delim = ",")
+
+# ### HW BART ------------------------------------------------
 train_clean <- train %>%
   select(-casual, -registered) %>% # Remove columns as per HW
   mutate(count = log(count))        # Log-transform target variable
@@ -277,57 +350,92 @@ bike_recipe <- recipe(count ~ ., data = train_clean) %>%
               hour_cos = cos(2 * pi * hour / 24)) %>%
   step_date(datetime, features="month") %>%
   step_date(datetime, features = "doy") %>%
+  step_time(datetime, features = "hour") %>%
+  step_interact(~datetime_hour:workingday) %>%
   step_rm(datetime) %>%
   step_normalize(all_numeric_predictors()) %>%
   step_dummy(all_nominal_predictors()) %>%
   step_zv(all_predictors()) # Remove zero-variance predictors
 
-# bake(prep(bike_recipe), new_data=train_clean) %>%
-#   summary(.)
+# new_data <- bake(prep(bike_recipe), new_data=train_clean)
+# vroom_write(new_data, "new_data.csv", delim = ",")
 
-preg_model <- rand_forest(mtry = tune(), 
-                          min_n = tune(),
-                          trees=500) %>%
-  set_engine("ranger") %>%
-  set_mode("regression")
+# preg_model <- bart(trees = tune()) %>%
+#   set_engine("dbarts") %>%
+#   set_mode("regression")
+# 
+# preg_wf <- workflow() %>%
+#   add_recipe(bike_recipe) %>%
+#   add_model(preg_model) 
+# 
+# prepped <- prep(bike_recipe)
+# # num_predictors <- ncol(bake(prepped, new_data = NULL)) - 1
+# 
+# grid_of_tuning_params <- grid_regular(trees(),
+#                                       levels = 5)
+# 
+# folds <- vfold_cv(train_clean, v = 10, repeats = 1)
+# 
+# CV_results <- preg_wf %>%
+#   tune_grid(resamples=folds,
+#             grid=grid_of_tuning_params,
+#             metrics = metric_set(rmse)) #change to mae 
+# 
+# bestTune <- CV_results |>
+#   select_best(metric="rmse")
+# 
+# final_wf <-preg_wf |>
+#   finalize_workflow(bestTune) |>
+#   fit(data=train_clean)
+# 
+# bike_preds <- final_wf %>%
+#   predict(new_data=test) %>%
+#   mutate(count = exp(.pred))
+# 
+# kaggle_submission <- bike_preds %>%
+#   bind_cols(test %>% select(datetime)) %>%  # Keep original test datetime
+#   select(datetime, count) %>%               # Column order
+#   mutate(count = pmax(0, count)) %>%
+#   mutate(datetime=as.character(format(datetime)))
+# 
+# vroom_write(kaggle_submission, "BART_v1.csv", delim = ",")
 
-preg_wf <- workflow() %>%
-  add_recipe(bike_recipe) %>%
-  add_model(preg_model) 
-
-prepped <- prep(bike_recipe)
-num_predictors <- ncol(bake(prepped, new_data = NULL)) - 1
-
-grid_of_tuning_params <- grid_regular(mtry(range = c(1, num_predictors)),
-                                      min_n(),
-                                      levels = 5)
-
-# grid_of_tuning_params <- grid_regular(mtry(range=c(1, ncol(train_clean)-1)),
-#                                       min_n(),
-#                                       levels =5)
-
-folds <- vfold_cv(train_clean, v = 10, repeats = 1)
-
-CV_results <- preg_wf %>%
-  tune_grid(resamples=folds,
-            grid=grid_of_tuning_params,
-            metrics = metric_set(rmse)) #change to mae 
-
-bestTune <- CV_results |>
-  select_best(metric="rmse")
-
-final_wf <-preg_wf |>
-  finalize_workflow(bestTune) |>
-  fit(data=train_clean)
-
-bike_preds <- final_wf %>%
-  predict(new_data=test) %>%
-  mutate(count = exp(.pred))
-
-kaggle_submission <- bike_preds %>%
-  bind_cols(test %>% select(datetime)) %>%  # Keep original test datetime
-  select(datetime, count) %>%               # Column order
-  mutate(count = pmax(0, count)) %>%
-  mutate(datetime=as.character(format(datetime)))
-
-vroom_write(kaggle_submission, "LinearPreds_v4.csv", delim = ",")
+# ###### HW STACKING
+# 
+# ## Libraries1
+# library(agua) #Install if necessary2
+# 
+# ## Initialize an h2o session4
+# h2o::h2o.init()
+# 
+# ## Define the model7
+# max_runtime_secs = 300 #how long to let h2o.ai run8
+# max_models = 10 #how many models to stack9
+# auto_model <- auto_ml() %>%
+#   set_engine("h2o", max_runtime_secs = max_runtime_secs, max_models = max_models) %>%
+#   set_mode("regression")
+# 
+# ## Combine into Workflow14
+# automl_wf <- workflow() %>%
+#   add_recipe(bike_recipe) %>%
+#   add_model(auto_model) %>%
+#   fit(data=train_clean)
+# 
+# #
+# # preg_wf <- workflow() %>%
+# #   add_recipe(bike_recipe) %>%
+# #   add_model(preg_model)
+# 
+# ## Predict
+# # preds <- predict(...)
+# bike_preds <- automl_wf %>%
+#   predict(new_data=test) %>%
+#   mutate(count = exp(.pred))
+# 
+# kaggle_submission <- bike_preds %>%
+#   bind_cols(test %>% select(datetime)) %>%  # Keep original test datetime
+#   select(datetime, count) %>%               # Column order
+#   mutate(count = pmax(0, count)) %>%
+#   mutate(datetime=as.character(format(datetime)))
+# 
+# vroom_write(kaggle_submission, "STACK_v1.csv", delim = ",")
