@@ -36,24 +36,24 @@ test <- vroom("C:/Users/Jenna/OneDrive/Desktop/Statistics/Stat 348/BikeShare/tes
 
 # HW Step 1: Data Cleaning
 # train_clean <- train %>%
-#   select(-casual, -registered) %>% # Remove columns as per HW
-#   mutate(count = log(count))        # Log-transform target variable
-
-# # HW Step 2: Feature Engineering
-# bike_recipe <- recipe(count ~ ., data = train_clean) %>%
-#   step_mutate(weather = ifelse(weather == 4, 3, weather)) %>% # Recode weather 4->3
-#   # step_mutate(weather = factor(weather)) %>%
-#   # step_mutate(holiday = factor(holiday)) %>%
-#   # step_mutate(workingday = factor(workingday)) %>%
-#   # step_mutate(season = factor(season)) %>%  
-#   # step_mutate(hour = hour(datetime)) %>%
-#   step_time(datetime, features="hour") %>%
-#   step_date(datetime, features="month") %>%
-#   step_date(datetime, features = "doy") %>%
-#   step_rm(datetime) %>%
-#   step_normalize(all_numeric_predictors()) %>%
-#   step_dummy(all_nominal_predictors()) %>%
-#   step_zv(all_predictors()) # Remove zero-variance predictors
+#    select(-casual, -registered) %>% # Remove columns as per HW
+#    mutate(count = log(count))        # Log-transform target variable
+# 
+#  # HW Step 2: Feature Engineering
+#  bike_recipe <- recipe(count ~ ., data = train_clean) %>%
+#    step_mutate(weather = ifelse(weather == 4, 3, weather)) %>% # Recode weather 4->3
+#    # step_mutate(weather = factor(weather)) %>%
+#    # step_mutate(holiday = factor(holiday)) %>%
+#    # step_mutate(workingday = factor(workingday)) %>%
+#    # step_mutate(season = factor(season)) %>%
+#    # step_mutate(hour = hour(datetime)) %>%
+#    step_time(datetime, features="hour") %>%
+#    step_date(datetime, features="month") %>%
+#    step_date(datetime, features = "doy") %>%
+#    step_rm(datetime) %>%
+#    step_normalize(all_numeric_predictors()) %>%
+#    step_dummy(all_nominal_predictors()) %>%
+#    step_zv(all_predictors()) # Remove zero-variance predictors
 # 
 # # Prepare and bake recipe (optional check)
 # # prepped_recipe <- prep(bike_recipe)
